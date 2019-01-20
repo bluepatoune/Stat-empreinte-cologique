@@ -1,0 +1,469 @@
+---
+title: 'Projet de statistique: Empreinte √©cologique'
+author: "Charlotte Petroff, Adrien Simonnet"
+date: "25 d√©cembre 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# TO DO :
+- recherche biblio    
+- une introduction courte et ciblee presentant la cadre general du projet et les questions que vous
+voulez etudier.
+- une partie descriptive presentant les donnees et leurs caracteristiques par exemple sous forme de
+graphes ou de resumes statistiques. Cette partie, souvent negligee, a pour but de bien apprehender
+vos donnees (bien les connaitre, detecter des anomalies comme des valeurs aberrantes, donnees man-
+quantes, etc ....) et surtout elle permet de faire emerger les questions qui seront traitees dans la
+suite.
+- une partie d'analyse : pour chaque question identifiee, vous
+  - ecrirez sous forme mathematique propre le modele statistique qui vous permettra d'y repondre,
+  - presenterez les resultats pertinents et conclurez sur la question posee.
+Il ne s'agit pas de chercher le modele le plus complet possible mais plut^ot des modeles permettant
+de repondre aux questions posees.
+- une conclusion resumant les principaux resultats obtenus et leurs consequences.
+
+_ √©tudier une variable exemple for√™t en fnction de la zone pour voir d√©forestation entre 2005 et 2008 
+2008 - 2005 = nouvelle variable 
+
+
+_ faire une r√©gression pour 2005 et 2008 : cha 
+
+_ aic pour total ecological footprint  et total bocapcity 
+
+
+##Introduction 
+
+L'√©tude statistique suivante porte sur des donn√©es r√©cup√©r√©es sur le site de l'ONG Global Footprint Network. Il contient  pour chaque pays, pour les ann√©es 2005 et 2008, des mesures de son empreinte √©cologique, de la biocapacit√© en nombre d'hectares par habitants, et de la diff√©rence entre ces deux variables. Une diff√©rence de biocapacit√© n√©gative repr√©sente un d√©ficit de biocapacit√© du pays. 
+
+L'empreinte √©cologique et la biocapacit√© sont d√©compos√©s en plusieurs variables, il pourrait donc √™tre int√©ressant de d√©terminer lesquelles de ces variables sont les plus influentes.
+
+Nous disposons aussi d'informatons sur la population, le revenu moyen des habitants et la zone g√©ographique du Pays. Ce sont des param√®tres qui sont peut √™tre reli√©e au mesures d'empreinte √©cologique ou de biocapacit√©. 
+
+
+# Visualisation des donn√©es 
+
+Nous allons commencer par v√©rifier que toutes nos donn√©es sont exploitables:  
+
+```{r cars}
+Data<- read.table(file="TP_Empreinte_Ecologique.csv", sep=";", header = TRUE)
+str(Data)
+head(Data)
+```
+
+On observe de nombreuses absences de donn√©es, pour ne pas avoir de probl√®mes par la suite nous avons d√©cid√© de suprimer 8 lignes de donn√©es qui contenait des "NA". Ce nombre de donn√©e est acceptable car il nous reste 145 lignes de donn√©es apr√®s l'op√©ration.    
+
+
+Nous red√©finissons le nouveau jeu de donn√©es:
+```{r}
+Data<- read.table(file="TP_Empreinte_Ecologique_na.csv", sep=";", header = TRUE)
+head(Data)
+summary(Data)
+with(Data, table(Zone,Income.Group))
+```
+
+Dans le jeu de donn√©es, seules les variables Income.Group et Zone sont qualitatives. Les autres sont quantitatives, en hectares par habitants. 
+
+On remarque que les donn√©es ne sont pas √©quilibr√©es entre les deux variables qualitatives. 
+
+#I- ACP 
+On se concentre sur les donn√©es de 2008 dans un premier temps:
+```{r}
+library(FactoMineR)
+Data2008 = Data[,19:33]
+Data2008_norm = scale(Data2008[,2:14], scale= T, center= T)
+acp.norm8 = PCA (Data2008_norm, scale.unit= TRUE, graph = F, ncp = 13)
+library("factoextra")
+fviz_eig(acp.norm8, addlabels = TRUE, ylim = c(0, 50))
+acp.norm8$var$contrib[, 1:3]
+```
+
+D'apr√®s le graphique repr√©sentant le pourcentage de la variance expliqu√© par rapport au nombre de composantes, on peut r√©tenir 3 composantes pour expliquer la variabilit√© des donn√©es. 
+
+D'apr√®s les pourcentages de contribution la dimension 1 est la mieux repr√©sent√©e par l'empreinte √©cologique totale et en moindre mesure par l'empreinte des for√™ts et des cultures.    
+
+La dimension 2 est repr√©sent√©e par la biocapacit√© totale ainsi que la biocapacit√© des p√¢turages et des for√™ts.    
+
+La dimension 3 est repr√©sent√©e par l'empreinte √©cologique totale et par l'empreinte des p√¢turages et des rejets de carbone.     
+
+```{r}
+
+plot(acp.norm8, choix="var")
+
+plot(acp.norm8, choix="ind")
+
+```
+Globalement les variables d'empreinte √©cologique sont corr√©l√©es entre elles et celles de biocapacit√© sont corr√©l√©es entre elles, ces deux groupes sont orient√©s de part et d'autre de la dimension 2 et dans la direction positive de la dimension 1. 
+
+La plus part des pays sont situ√©s au milieu entre empreinte √©cologique et biocapacit√©, ce qui montre que la plus part des pays ne surexploite pas leur disponibilit√©s biologiques. Certains pays ont semplent avoir une balance plus positive, d'autres n√©gative. 
+
+#II- Orde d'importance des variables composant l'empreinte Ècologique et la biocapacitÈ 
+
+Nous allons d√©terminer quel est l'ordre d'importance des composantes de l'empreinte √©cologique et la biocapacit√©.
+
+```{r}
+modele_0 <- lm(Total.Ecological.Footprint2008 ~ 1, data = Data)
+
+
+modele_log_stepwise <- 
+  step(modele_0, data = Data,
+       scope =~ Carbon.Footprint2008 + Built.up.land.footprint2008 + Fish.Footprint2008 + Forest.Footprint2008 + 
+         Grazing.Footprint2008 + Cropland.Footprint2008)
+
+```
+
+On optient l'ordre d'importance pour la composition de l'empreinte √©cologique suivant: 
+l' empreinte carbone, du p√¢turage, des cultures, de la foresterie, de la p√™che et enfin de l'urbanisation.
+
+```{r}
+modele_0 <- lm(Total.biocapacity.2008 ~ 1, data = Data)
+
+
+modele_log_stepwise <- 
+  step(modele_0, data = Data,
+       scope =~ Built.up.land2008 + Fishing.ground2008+ Forest.land2008 +  Grazing.land2008 + Cropland2008)
+```      
+On obtient l'ordre d'importance des composantes de la biocapacit√© suivant: 
+Les surfaces de for√™t, de p√¢turage, de p√™che, de culture, et enfin les zones b√¢ties. 
+
+Ces donn√©es correspondent aux pourcentage de contribution que nous avons trouv√© au sein de l'ACP. 
+
+
+#III- RÈgression linÈaire multiple 
+
+Nous avons plusieurs pistes de variables explicatives pour l'empreinte √©cologique, la biocapacit√© et la diff√©rence de biocapacit√© en 2008 : Ces m√™mes variables en 2005, la zone , le revenu et la population. 
+
+#Analyse graphique de la relation entre les 3 variables d'intÈrÍt et les variables quantitatives.
+
+##a- ReprÈsentation de l'influence de l'Ètat en 2005 sur l'Ètat en 2008.   
+
+```{r}
+library(ggplot2)
+ggplot(Data)+aes(x=Biocapacity.difference.2008,y= Biocapacity.difference.2005,color = Income.Group)+
+  geom_point()+ 
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)
+
+ggplot(Data)+aes(x=Total.biocapacity.2008,y= Total.biocapacity.2005,color = Income.Group)+
+  geom_point()+ 
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)
+
+ggplot(Data)+aes(x=Total.Ecological.Footprint2008,y= Total.Ecological.Footprint2005,color = Income.Group)+
+  geom_point()+
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)
+```
+
+
+relation lin√©aire entre les donn√©es des ann√©es 2005 et 2008 pour l'empreinte √©cologique, la capacit√© biologique et la diff√©rence de biocapacit√©.   
+
+Diff√©rence entre 2008 et 2005 
+
+le faite que les resultats de 2008 d√©pendendent de ceux de 2005 t√©moigne du grande inertie. 
+
+#IV- Graphique en fonction de la population de 2008   
+
+Nous avons cherchÈ ensuite a regarder si la taille des populations pouvaient Ítre corrÈlÈe ‡ l'empreinte carbone des pays, ‡ leur capacitÈ d'accueil biologique ou encore ‡ la diffÈrence de biocapacitÈ :   
+
+```{r}
+
+ggplot(Data)+aes(x=Population.2008,y= Total.Ecological.Footprint2008,label = Data$Country, color = Income.Group )+
+  geom_point()+
+  geom_text(aes(label= Data$Country,hjust=0, vjust=1 ))
+
+ggplot(Data)+aes(x=Population.2008,y= Total.biocapacity.2008,label = Data$Country, color = Income.Group )+
+  geom_point()+
+  geom_text(aes(label= Data$Country,hjust=0, vjust=1 ))
+
+ggplot(Data)+aes(x=Population.2008,y= Biocapacity.difference.2008,label = Data$Country, color = Income.Group )+
+  geom_point()+
+  geom_text(aes(label= Data$Country,hjust=0, vjust=1 ))
+
+```
+
+
+
+
+Nous pouvons observÈ alors gr‚ce aux graphiques prÈcÈdents que la taille de la population n'est pas corrÈlÈe ‡ ces diffÈrentes grandeurs.    
+
+
+#V- Analyse graphique de la relation entre les 3 variables d'intÈrÍts et les variables qualitatives.       
+
+Nous avons ensuite dÈcidÈ de nous intÈressÈs ‡ comparer les trois variables d'intÈrÍts (diffÈrence de biocapacitÈ, empreinte Ècologique et biocapacitÈ) aux grandeurs qualitatives ‡ savoir les revenus et les et les zones gÈographiques.     
+
+
+
+
+###a- Graphiques en fonction du revenu 
+
+
+Nous nous sommes ensuite attachÈs ‡ confronter les donnÈes de biocapacitÈ, d'empreinte Ècologique et enfin de la diffÈrence de biocapacitÈ aux revenus pour voir s'il existe une quelconque corrÈlations entre ces grandeurs :    
+
+
+
+```{r}
+
+library(ggplot2)
+
+  
+ggplot(Data) +
+  aes(x = Income.Group, y = Total.Ecological.Footprint2008, fill = Income.Group) +
+  geom_boxplot() 
+ 
+ggplot(Data) +
+  aes(x = Income.Group, y = Total.biocapacity.2008, fill = Income.Group) +
+  geom_boxplot()
+
+ggplot(Data) +
+  aes(x = Income.Group, y = Biocapacity.difference.2008, fill = Income.Group) +
+  geom_boxplot()
+
+
+```
+
+
+
+
+
+
+Nous pouvons voir que les revenus ne sont pas corrÈlÈs aux variables d'intÈrÍts. Nous observons que les pays ayant les plus grands revenus (HI), ont en moyenne une empreinte Ècologique plus importante que les pays avec des revenus moindre. Ceci pourrait s'expliquer par la plus forte industrialisation des pays avec des revenus plus importants.    
+D'autre part, nous pouvons observÈ que l'empreinte Ècologique est plus variable au sein de la classe des pays avec un gros revenus qu'au sein des autres classes. Cette variabilitÈ pourrait s'expliquer de diffÈrentes faÁon (diffÈrentes prÈoccupations et politiques environnementales existantes au sein de ces pays ou encore l'existence d'une variabiltÈ du niveau d'industrialisation plus importante au sein des pays riches).      
+
+
+
+
+###b- Graphique en fonction de la zone gÈographique :          
+
+
+Nous nous sommes intÈressÈs ensuite ‡ la possible existence d'une corrÈlation entre les variables d'intÈrÍts ÈtudiÈes et les zones gÈographiques.     
+
+```{r}
+ggplot(Data) +
+  aes(x = Zone, y = Total.Ecological.Footprint2008, fill = Zone) +
+  geom_boxplot()
+
+ggplot(Data) +
+  aes(x = Zone, y = Total.biocapacity.2008, fill = Zone) +
+  geom_boxplot()
+
+ggplot(Data) +
+  aes(x = Zone, y = Biocapacity.difference.2008, fill = Zone) +
+  geom_boxplot()
+# bon 
+```
+
+Nous pouvons voir ‡ l'aide de ces graphiques que les zones gÈographiques n'ont pas de lien marquÈ avec la biocapacitÈ ou la diffÈrence de biocapacitÈ.       
+
+Nous observons cependant une variabiltÈ plus importantes entre les empreintes Ècologiques et les zones gÈographiques. On remarque que les continents associÈes des pays plus "dÈveloppÈs" (AmÈrique du Nord ou Europe de l'Ouest), ont des ‡ des empreintes Ècologiques plus importantes. Ceci peut donc s'expliquer par le dÈveloppement des zones gÈographiques, dÈveloppement qui s'associe ‡ un impact Ècologique plus important.
+
+
+
+
+
+#VI- DÈtermination du meilleur modËle par critËre d'information d'Akaike (AIC) :   
+
+
+
+
+```{r}
+modele_0 <- lm(Total.Ecological.Footprint2008 ~ 1, data = Data)
+modele_log_stepwise <- 
+  step(modele_0, data = Data,
+       scope =~ Income.Group+ Zone + Population.2008 +Total.Ecological.Footprint2005 )
+
+modele_0 <- lm(Total.biocapacity.2008 ~ 1, data = Data)
+modele_log_stepwise <- 
+  step(modele_0, data = Data,
+       scope =~ Income.Group+ Zone + Population.2008 +Total.biocapacity.2005 )
+
+modele_0 <- lm(Biocapacity.difference.2008 ~ 1, data = Data)
+modele_log_stepwise <- 
+  step(modele_0, data = Data,
+       scope =~ Income.Group+ Zone + Population.2008 +Biocapacity.difference.2005 )
+
+```
+
+
+#VII- Ecriture des modËles: 
+
+Nous nous sommes appliquÈs ‡ Ètudier diffÈrents modËles :
+
+##a- Empreinte Ècologique :   
+
+Nous avons proposÈ un premier modËle. Il s'agit d'une Ancova faisant intervenir l'empreinte Ècologique et des revenus. Nous avons regardÈ si l'Èvolution de l'empreinte Ècologique entre 2005 et 2008 pouvait Ítre reliÈe aux revenus. : 
+
+
+```{r}
+
+modele <- lm(Total.Ecological.Footprint2008 ~ Total.Ecological.Footprint2005 + 
+    Income.Group, data = Data)
+modele0 <- lm(Total.Ecological.Footprint2008~1, data= Data)
+
+anova(modele0,modele)
+
+
+```
+
+
+AprËs analyse de ce modËle, on peut rejetter le modËle nul. En effet la p-value est infÈrieure ‡ 5%.L'Èvolution des emissions de carbone serait donc bien corrÈlÈe aux revenus des diffÈrents pays. Les pays avec des revenus plus importants (HI), aurait une augmentation moins importante que les autres pays de leur empreinte carbone.  
+
+
+```{r}
+library(car)
+Anova(modele)
+
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(modele)
+summary(modele)
+```
+
+On montre alors gr‚ce aux analyses prÈcÈdentes que toutes les modalitÈs sont significatives.
+
+##b- BiocapacitÈ :      
+
+Nous avons proposÈ un modËle analogue au prÈcÈdent, faisant cette fois-ci intervenir la biocapacitÈ et non plus l'empreinte Ècologique.
+
+
+```{r}
+
+modele <- lm(Total.biocapacity.2008 ~ Total.biocapacity.2005 + Zone, data = Data)
+modele0 <- lm(Total.biocapacity.2008~1, data= Data)
+
+anova(modele0,modele)
+```
+
+
+```{r}
+Anova(modele)
+```
+
+On ne peut pas rejetter le mod√®le nul mais on peut esssayer de garder seulement la variable zone  
+
+
+```{r}
+par(mfrow=c(2,2))
+plot(modele)
+summary(modele)
+```
+
+Seules certaines modalitÈs sont significatives (rÈgion d'AmÈrique du Nord et d'AmÈrique du SUd et la biocapacitÈ de 2005). Ainsi la rÈgion n'est pas un facteur corrÈlÈe ‡ la biocapacitÈ.
+
+##c- DiffÈrence de biocapacitÈ : 
+
+```{r}
+modele <- lm(Biocapacity.difference.2008 ~ Biocapacity.difference.2005, data = Data)
+modele0 <- lm(Biocapacity.difference.2008~1, data= Data)
+anova(modele0,modele)
+```
+
+On rejette le modËle nu.      
+
+```{r}
+
+Anova(modele)
+```
+
+
+```{r}
+par(mfrow=c(2,2))
+plot(modele)
+summary(modele)
+```
+
+On conclue que la diffÈrence entre empreinte Ècologique et la capacitÈ biologique des pays dÈpend principalement
+de la zone au quel ils appartiennent  
+
+
+
+
+#VIII- Analyse de la dÈforestation
+
+Nous nous sommes ensuite appliquÈs ‡ Ètudier la dÈforestation entre 2005 et 2008. Pour ce faire , nous avons tout d'abord crÈÈ une variable tÈmoignant de la dÈforestation. Nous avons donc crÈÈ la variable "Deforest". Il s'agit de la diffÈrence entre la  surface de forÍt en 2008 (caractÈrisÈe par Forest.land2008) et la surface de forÍt en 2005 (caractÈrisÈe par Forest.land2005).   
+
+```{r}
+Deforest <- Data$Forest.land2008-Data$Forest.land2005
+Data <- cbind(Data,Deforest)
+```
+
+Nous avons tout d'abord confrontÈ la dÈforestation aux zones gÈographiques :
+
+
+```{r}
+modele_0 <- lm(Deforest ~ 1, data = Data)
+modele_log_stepwise <- 
+  step(modele_0, data = Data,
+       scope =~ Income.Group+ Zone + Population.2008 + Cropland2008+Grazing.land2008+Built.up.land2008)
+
+modele=lm(Deforest ~ Grazing.land2008 + Cropland2008 + Zone,Data)
+modele0=lm(Deforest~1,Data)
+anova(modele0,modele)
+par(mfrow=c(2,2))
+plot(modele)
+ggplot(Data, aes(x = Zone, y = Deforest, fill = Zone)) +geom_boxplot() 
+
+
+
+```
+
+
+Nous avons pu observer que la dÈforestation ne varie pas vraiment selon les zones gÈographiques. Nous pouvons cependant voir que la dÈforestation varie enormÈment dans certains zones (comme l'AmÈrique du Sud), la variabilitÈ de dÈforestation est beaucoup plus importante que dans d'autres zones. Ceci s'expliquerait par la variabilitÈ de taille de forÍt qui existe au sein de ces zones. On peut ainsi supposer que la dÈforestation serait fonction de la surface en bois disponible plutÙt que la zone gÈographique.  
+
+
+Nous nous sommes pour se faire intÈressÈ au modËle suivant :   
+
+
+
+
+```{r}
+modele = lm (Deforest~Forest.land2008, data=Data)
+modele0=lm(Deforest~1,Data)
+anova(modele0,modele)
+
+```
+Le rÈsultat obtenu valide ainse l'hypothËse formulÈe prÈcedemment. La dÈforestation est corrÈlÈe de faÁon positive ‡ la surface de forÍt disponible. Les pays qui ont de larges surfaces forestiËres ont une dÈforestation qui est plus prononcÈe.   
+
+Le graphe obtenu confirme notre hypothËse :
+
+
+```{r}
+
+
+ggplot(Data, aes(x=Forest.land2008, y =Deforest)) +geom_point()
+
+```
+
+Nous avons ensuite cherchÈ ‡ comprendre ce que devenait ces terres dÈforestÈes en confrontant la dÈforestation aux autres surfaces d'intÈrÍts (surfaces de prairie, de champs ou encore surfaces urbaines).   
+Nous nous sommes alors intÈressÈ ‡ une regression linÈaire faisant intervenir ces diffÈrents paramËtres. L'utilisation d'une AIC nous permet ensuite de voir quels sont les paramËtres principaux expliquant la dÈforestation.
+
+
+```{r}
+modele=lm(Deforest~Cropland2008+Grazing.land2008+Built.up.land2008,Data)
+modele0=lm(Deforest~1,Data)
+anova(modele0,modele)
+step(modele)
+
+```
+
+
+La mÈthode du stepwise utilisÈe nous montre que la dÈforestation est surtout corrÈlÈe aux surfaces cultivÈes et aux surfaces de prairie. Nous pouvons ainsi supposer que la dÈforestation se fait avant tout au profit de nouvelles prairies et de nouveaux champs cultivÈs.
+
+
+
+#Conclusion :     
+
+
+
+Les donnÈes que nous avons traitÈes nous ont apportÈ plusieurs informations importantes quant aux empreintes Ècologiques :     
+- l'empreinte Ècologique des pays est surtout corrÈlÈe de leur revenus,
+- les donnÈes obtenues ne nous permettent pas de trouver de facteur corrÈlÈ ‡ la diffÈrence de biocapacitÈ,      
+- l'Èvolution des diffÈrents facteurs entre 2005 et 2008 nous montre qu'il n'y a pas eu de changement majeur dans l'impact Ècologique des diffÈrents pays. MÍme s'il existe des diffÈrences entre les pays avec des hauts revenus et les autres, cette diffÈrence reste faible. Ceci tÈmoigne de l'inertie de tout changement,     
+- l'Ètude particuliËre de la dÈforestation nous amËne des rÈsultats tout ‡ fait intÈressants sur les zones touchÈes par la dÈforestation et ce que deviennent en majoritÈ les terres dÈforestÈes.
+
+
+```{r}
+
+```
+
+
